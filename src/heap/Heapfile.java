@@ -23,7 +23,7 @@ public class Heapfile implements GlobalConst {
 
 	public Scan openScan() {
 		// TODO Auto-generated method stub
-		return null;
+		return new Scan();
 	}
 
 	public boolean deleteRecord(RID rid) {

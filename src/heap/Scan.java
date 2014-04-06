@@ -6,7 +6,7 @@ public class Scan {
 
 	public Tuple getNext(RID rid) {
 		// TODO Auto-generated method stub
-		return null;
+		return new Tuple();
 	}
 
 	public void closescan() {

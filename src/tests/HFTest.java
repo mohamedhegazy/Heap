@@ -116,7 +116,7 @@ public boolean runTests () {
       for (int i =0; (i < choice) && (status == OK); i++) {
 	
 	//fixed length record
-	DummyRecord rec = new DummyRecord(reclen);
+    DummyRecord rec = new DummyRecord(reclen);
 	rec.ival = i;
 	rec.fval = (float) (i*2.5);
 	rec.name = "record" + i;
@@ -837,7 +837,6 @@ class DummyRecord  {
     data = new byte[_atuple.getLength()];
     data = _atuple.getTupleByteArray();
     setRecLen(_atuple.getLength());
-    
     setIntRec (data);
     setFloRec (data);
     setStrRec (data);

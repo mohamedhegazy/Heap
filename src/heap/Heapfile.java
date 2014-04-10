@@ -3,6 +3,8 @@ package heap;
 import java.io.IOException;
 import java.util.LinkedList;
 
+import javax.xml.bind.annotation.XmlElementDecl.GLOBAL;
+
 import bufmgr.BufMgrException;
 import bufmgr.BufferPoolExceededException;
 import bufmgr.HashEntryNotFoundException;
@@ -25,62 +27,59 @@ public class Heapfile implements GlobalConst {
 	private HFPage head;
 	private int reccnt = 0;
 
-	public Heapfile(String string) throws IOException, BufferPoolExceededException, HashOperationException, ReplacerException, HashEntryNotFoundException, InvalidFrameNumberException, PagePinnedException, PageUnpinnedException, PageNotReadException, BufMgrException, DiskMgrException {
+	public Heapfile(String string) throws IOException,
+			BufferPoolExceededException, HashOperationException,
+			ReplacerException, HashEntryNotFoundException,
+			InvalidFrameNumberException, PagePinnedException,
+			PageUnpinnedException, PageNotReadException, BufMgrException,
+			DiskMgrException {
 		// TODO Auto-generated constructor stub
 		this.name = string;
-		head = new HFPage(new Page());
-		PageId id=SystemDefs.JavabaseBM.newPage(head, 1);
-		head.setNextPage(new PageId());// pid of next is 0
-		head.setPrevPage(new PageId());// pid of prev is 0
+		head = new HFPage();
+		PageId id = SystemDefs.JavabaseBM.newPage(head, 1);
+		head.init(id, new Page());
 		head.setCurPage(id);
+		head.setPrevPage(new PageId(GlobalConst.INVALID_PAGE));
+		head.setNextPage(new PageId(GlobalConst.INVALID_PAGE));
 		SystemDefs.JavabaseBM.unpinPage(head.getCurPage(), false);
 
 	}
 
 	public RID insertRecord(byte[] byteArray) throws Exception {
 		// TODO Auto-generated method stub
-		PageId pgId = new PageId();
 		RID rid = null;
-		HFPage page = new HFPage(new Page());
-		if (head.getPrevPage().pid == 0) {// in case the heapfile has no free
-											// pages at the beginning
-			pgId=SystemDefs.JavabaseBM.newPage(page, 1);
-			page.setCurPage(pgId);
-			head.setPrevPage(page.getCurPage());// direction to left of free
-												// space pages
-			page.setPrevPage(head.getCurPage());
-			page.setNextPage(new PageId());
-			rid = page.insertRecord(byteArray);
-			SystemDefs.JavabaseBM.unpinPage(page.getCurPage(), true);
-			reccnt++;
-			return rid;
-		} else {
-			pgId = head.getPrevPage();
-			while (rid == null) {
-				SystemDefs.JavabaseBM.pinPage(pgId, page, false);
-				rid = page.insertRecord(byteArray);
-				if (rid != null) {// enough space for record was found on page
-									// and it was inserted
-					reccnt++;
-					SystemDefs.JavabaseBM.unpinPage(page.getCurPage(), true);
-					return rid;
-				}
-				SystemDefs.JavabaseBM.unpinPage(page.getCurPage(), false);
-				if (page.getNextPage().pid == 0) {// no space for record so we
-													// allocate new one
-					PageId temPageId = page.getCurPage();
-					page = new HFPage();
-					SystemDefs.JavabaseBM.newPage(page, 1);
-					page.setNextPage(new PageId());
-					page.setPrevPage(temPageId);
-					rid = page.insertRecord(byteArray);
-					reccnt++;
-					SystemDefs.JavabaseBM.unpinPage(page.getCurPage(), true);
-				}
+		PageId id = head.getCurPage();
+		HFPage temPage = new HFPage();
+		SystemDefs.JavabaseBM.pinPage(id, temPage, false);
+		temPage.init(id, new Page(temPage.getpage()));
+		while (true) {
+			rid = temPage.insertRecord(byteArray);
+			if (rid != null) {
+				SystemDefs.JavabaseBM.unpinPage(id, true);
+				reccnt++;
+				return rid;
+			} else if (rid == null) {
+				SystemDefs.JavabaseBM.unpinPage(id, false);
+			}
+			if (temPage.getNextPage().pid == GlobalConst.INVALID_PAGE) {
+				HFPage new_page = new HFPage();
+				id = SystemDefs.JavabaseBM.newPage(new_page, 1);
+				new_page.init(id, new Page());
+				temPage.setNextPage(id);
+				new_page.setPrevPage(temPage.getCurPage());
+				new_page.setCurPage(id);
+				new_page.setNextPage(new PageId(GlobalConst.INVALID_PAGE));
+				rid = new_page.insertRecord(byteArray);
+				SystemDefs.JavabaseBM.unpinPage(new_page.getCurPage(), true);
+				reccnt++;
+				return rid;
+
+			} else {
+				id = temPage.getNextPage();
+				SystemDefs.JavabaseBM.pinPage(id, temPage, false);
+
 			}
 		}
-
-		return rid;
 	}
 
 	public int getRecCnt() {

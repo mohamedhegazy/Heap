@@ -1,9 +1,7 @@
 package heap;
 
 import java.io.IOException;
-import java.util.LinkedList;
-
-import javax.xml.bind.annotation.XmlElementDecl.GLOBAL;
+import java.util.ArrayList;
 
 import bufmgr.BufMgrException;
 import bufmgr.BufferPoolExceededException;
@@ -29,9 +27,11 @@ import global.RID;
 import global.SystemDefs;
 
 public class Heapfile implements GlobalConst {
+	@SuppressWarnings("unused")
 	private String name;
 	private HFPage head;
 	private int reccnt = 0;
+	private ArrayList<HFPageInfo> pages_info;
 
 	public Heapfile(String string) throws IOException,
 			BufferPoolExceededException, HashOperationException,
@@ -53,11 +53,19 @@ public class Heapfile implements GlobalConst {
 			head.setCurPage(id);
 			head.setPrevPage(new PageId(GlobalConst.INVALID_PAGE));
 			head.setNextPage(new PageId(GlobalConst.INVALID_PAGE));
+			pages_info = new ArrayList<HFPageInfo>();
+			pages_info.add(new HFPageInfo(head.getUsedPtr(), head
+					.getFreeSpace(), head.getType(), head.getSlotCnt(), head
+					.getPrevPage(), head.getNextPage(), head.getCurPage()));
+			pages_info.add(new HFPageInfo(head.getUsedPtr(), head
+					.getFreeSpace(), head.getType(), head.getSlotCnt(), head
+					.getPrevPage(), head.getNextPage(), new PageId(
+					GlobalConst.INVALID_PAGE)));
 			SystemDefs.JavabaseBM.unpinPage(head.getCurPage(), false);
 			SystemDefs.JavabaseDB.add_file_entry(string, id);
 		} else {// file exists
 			this.name = string;
-			head=new HFPage();
+			head = new HFPage();
 			PageId id = SystemDefs.JavabaseDB.get_file_entry(string);
 			SystemDefs.JavabaseBM.pinPage(id, head, false);
 			head.init(id, head);
@@ -70,39 +78,57 @@ public class Heapfile implements GlobalConst {
 		if (byteArray.length > MINIBASE_PAGESIZE) {
 			throw new SpaceNotAvailableException(null, "Very large record");
 		}
-		RID rid = null;
-		PageId id = head.getCurPage();
 		HFPage temPage = new HFPage();
-		SystemDefs.JavabaseBM.pinPage(id, temPage, false);
-		temPage.init(id, new Page(temPage.getpage()));
-		while (true) {
-			rid = temPage.insertRecord(byteArray);
-			if (rid != null) {
+		RID rid = null;
+		PageId id = null;
+		for (int i = 0; i < pages_info.size(); i++) {
+			HFPageInfo info = pages_info.get(i);
+			id = info.getCurPage();
+			if (info.getCurPage().pid == GlobalConst.INVALID_PAGE) {
+				id = SystemDefs.JavabaseBM.newPage(temPage, 1);
+				temPage.init(id, new Page());
+				rid = temPage.insertRecord(byteArray);
+				pages_info
+						.add(i,
+								new HFPageInfo(temPage.getUsedPtr(), temPage
+										.getFreeSpace(), temPage.getType(),
+										temPage.getSlotCnt(),
+										i == 0 ? new PageId(
+												GlobalConst.INVALID_PAGE)
+												: pages_info.get(i - 1)
+														.getCurPage(),
+										new PageId(GlobalConst.INVALID_PAGE),
+										temPage.getCurPage()));
+
+				reccnt++;
 				SystemDefs.JavabaseBM.unpinPage(id, true);
-				reccnt++;
 				return rid;
-			} else if (rid == null) {
-				SystemDefs.JavabaseBM.unpinPage(id, false);
-			}
-			if (temPage.getNextPage().pid == GlobalConst.INVALID_PAGE) {
-				HFPage new_page = new HFPage();
-				id = SystemDefs.JavabaseBM.newPage(new_page, 1);
-				new_page.init(id, new Page());
-				temPage.setNextPage(id);
-				new_page.setPrevPage(temPage.getCurPage());
-				new_page.setCurPage(id);
-				new_page.setNextPage(new PageId(GlobalConst.INVALID_PAGE));
-				rid = new_page.insertRecord(byteArray);
-				SystemDefs.JavabaseBM.unpinPage(new_page.getCurPage(), true);
-				reccnt++;
-				return rid;
-
 			} else {
-				id = temPage.getNextPage();
 				SystemDefs.JavabaseBM.pinPage(id, temPage, false);
-
+				temPage.setCurPage(info.getCurPage());
+				temPage.setNextPage(info.getNextPage());
+				temPage.setPrevPage(info.getPrevPage());
+				temPage.setSlotCnt(info.getSlotCnt());
+				;
+				temPage.setFreeSpace(info.getFreeSpace());
+				temPage.setUsedPtr(info.getUsedPtr());
+				// temPage.setType(info.getType());
+				rid = temPage.insertRecord(byteArray);
+				if (rid == null) {
+					SystemDefs.JavabaseBM.unpinPage(id, false);
+					continue;
+				} else {
+					pages_info.get(i).setUsedPtr(temPage.getUsedPtr());
+					pages_info.get(i).setFreeSpace(temPage.getFreeSpace());
+					pages_info.get(i).setSlotCnt(temPage.getSlotCnt());
+					// pages_info.get(i).setType(temPage.getType());
+					reccnt++;
+					SystemDefs.JavabaseBM.unpinPage(id, true);
+					return rid;
+				}
 			}
 		}
+		return rid;
 	}
 
 	public int getRecCnt() {
@@ -121,62 +147,73 @@ public class Heapfile implements GlobalConst {
 			BufferPoolExceededException, PagePinnedException, BufMgrException,
 			HashEntryNotFoundException {
 		// TODO Auto-generated method stub
-		PageId id = head.getCurPage();
+		PageId id = null;
 		HFPage temPage = new HFPage();
-		SystemDefs.JavabaseBM.pinPage(id, temPage, false);
-		temPage.init(id, new Page(temPage.getpage()));
-		while (true) {
-			boolean record_exists = true;
-			try {
-				temPage.deleteRecord(rid);
-				reccnt--;
-				SystemDefs.JavabaseBM.unpinPage(id, true);
-				return true;
-			} catch (Exception e) {
-				// TODO: handle exception
-				record_exists = false;
-				SystemDefs.JavabaseBM.unpinPage(id, false);
-			}
-			if (!record_exists) {
-				id = temPage.getNextPage();
-				if (id.pid == GlobalConst.INVALID_PAGE) {
-					return false;
-				}
+		for (int i = 0; i < pages_info.size(); i++) {
+			HFPageInfo info = pages_info.get(i);
+			id = info.getCurPage();
+			if (info.getCurPage().pid == GlobalConst.INVALID_PAGE) {
+				return false;
+			} else {
 				SystemDefs.JavabaseBM.pinPage(id, temPage, false);
+				temPage.setCurPage(info.getCurPage());
+				temPage.setNextPage(info.getNextPage());
+				temPage.setPrevPage(info.getPrevPage());
+				temPage.setSlotCnt(info.getSlotCnt());
+				temPage.setFreeSpace(info.getFreeSpace());
+				temPage.setUsedPtr(info.getUsedPtr());
+				// temPage.setType(info.getType());
+				try {
+					temPage.deleteRecord(rid);
+					reccnt--;
+					SystemDefs.JavabaseBM.unpinPage(id, true);
+					return true;
+				} catch (Exception e) {
+					// TODO: handle exception
+					SystemDefs.JavabaseBM.unpinPage(id, false);
+				}
+
 			}
 		}
+		return false;
 	}
 
 	public boolean updateRecord(RID rid, Tuple newTuple) throws ChainException,
 			IOException {
 		// TODO Auto-generated method stub
-		PageId id = head.getCurPage();
+		PageId id = null;
 		HFPage temPage = new HFPage();
-		SystemDefs.JavabaseBM.pinPage(id, temPage, false);
-		temPage.init(id, new Page(temPage.getpage()));
-		while (true) {
-			boolean record_exists = true;
-			try {
-				Tuple temp = temPage.getRecord(rid);
-				if (temp.getLength() != newTuple.getLength()) {
-					throw new InvalidUpdateException(null, "Not valid update");
+		for (int i = 0; i < pages_info.size(); i++) {
+			HFPageInfo info = pages_info.get(i);
+			id = info.getCurPage();
+			if (info.getCurPage().pid == GlobalConst.INVALID_PAGE) {
+				return false;
+			} else {
+				SystemDefs.JavabaseBM.pinPage(id, temPage, false);
+				temPage.setCurPage(info.getCurPage());
+				temPage.setNextPage(info.getNextPage());
+				temPage.setPrevPage(info.getPrevPage());
+				temPage.setSlotCnt(info.getSlotCnt());
+				temPage.setFreeSpace(info.getFreeSpace());
+				temPage.setUsedPtr(info.getUsedPtr());
+				// temPage.setType(info.getType());
+				try {
+					Tuple temp = temPage.getRecord(rid);
+					if (temp.getLength() != newTuple.getLength()) {
+						throw new InvalidUpdateException(null,
+								"Not valid update");
+					}
+					temp.tupleCopy(newTuple);
+					SystemDefs.JavabaseBM.unpinPage(id, true);
+					return true;
+				} catch (Exception e) {
+					// TODO: handle exception
+					SystemDefs.JavabaseBM.unpinPage(id, false);
 				}
 
-				SystemDefs.JavabaseBM.unpinPage(id, true);
-				return true;
-			} catch (Exception e) {
-				// TODO: handle exception
-				record_exists = false;
-				SystemDefs.JavabaseBM.unpinPage(id, false);
-			}
-			if (!record_exists) {
-				id = temPage.getNextPage();
-				if (id.pid == GlobalConst.INVALID_PAGE) {
-					return false;
-				}
-				SystemDefs.JavabaseBM.pinPage(id, temPage, false);
 			}
 		}
+		return false;
 	}
 
 	public Tuple getRecord(RID rid) throws IOException, ReplacerException,
@@ -185,29 +222,33 @@ public class Heapfile implements GlobalConst {
 			BufferPoolExceededException, PagePinnedException, BufMgrException,
 			HashEntryNotFoundException {
 		// TODO Auto-generated method stub
-		PageId id = head.getCurPage();
+		PageId id = null;
 		HFPage temPage = new HFPage();
-		SystemDefs.JavabaseBM.pinPage(id, temPage, false);
-		temPage.init(id, new Page(temPage.getpage()));
-		while (true) {
-			boolean record_exists = true;
-			try {
-				Tuple temp = temPage.getRecord(rid);
-				SystemDefs.JavabaseBM.unpinPage(id, false);
-				return temp;
-			} catch (Exception e) {
-				// TODO: handle exception
-				record_exists = false;
-				SystemDefs.JavabaseBM.unpinPage(id, false);
-			}
-			if (!record_exists) {
-				id = temPage.getNextPage();
-				if (id.pid == GlobalConst.INVALID_PAGE) {
-					return null;
-				}
+		for (int i = 0; i < pages_info.size(); i++) {
+			HFPageInfo info = pages_info.get(i);
+			id = info.getCurPage();
+			if (info.getCurPage().pid == GlobalConst.INVALID_PAGE) {
+				return null;
+			} else {
 				SystemDefs.JavabaseBM.pinPage(id, temPage, false);
+				temPage.setCurPage(info.getCurPage());
+				temPage.setNextPage(info.getNextPage());
+				temPage.setPrevPage(info.getPrevPage());
+				temPage.setSlotCnt(info.getSlotCnt());
+				temPage.setFreeSpace(info.getFreeSpace());
+				temPage.setUsedPtr(info.getUsedPtr());
+				// temPage.setType(info.getType());
+				try {
+					Tuple temp = temPage.getRecord(rid);
+					SystemDefs.JavabaseBM.unpinPage(id, true);
+					return temp;
+				} catch (Exception e) {
+					// TODO: handle exception
+					SystemDefs.JavabaseBM.unpinPage(id, false);
+				}
+
 			}
 		}
+		return null;
 	}
-
 }

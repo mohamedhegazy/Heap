@@ -23,7 +23,7 @@ class HFDriver extends TestDriver implements GlobalConst
   public HFDriver () {
     super("hptest");
     choice = 100;      // big enough for file to occupy > 1 data page
-    //choice = 2000;   // big enough for file to occupy > 1 directory page
+//    choice = 2000;   // big enough for file to occupy > 1 directory page
     //choice = 5;
   }
   

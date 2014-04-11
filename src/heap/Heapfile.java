@@ -49,6 +49,7 @@ public class Heapfile implements GlobalConst {
 			id_head = SystemDefs.JavabaseBM.newPage(head, 1);
 			head.init(id_head, new Page(head.getHFpageArray()));
 			SystemDefs.JavabaseBM.unpinPage(id_head, true);
+			SystemDefs.JavabaseDB.add_file_entry(string, id_head);
 		} else {
 			head = new HFPage();
 			id_head = SystemDefs.JavabaseDB.get_file_entry(string);
@@ -103,7 +104,10 @@ public class Heapfile implements GlobalConst {
 		return reccnt;
 	}
 
-	public Scan openScan() {
+	public Scan openScan() throws ReplacerException, HashOperationException,
+			PageUnpinnedException, InvalidFrameNumberException,
+			PageNotReadException, BufferPoolExceededException,
+			PagePinnedException, BufMgrException, IOException {
 		// TODO Auto-generated method stub
 		return new Scan(this);
 	}
@@ -123,6 +127,7 @@ public class Heapfile implements GlobalConst {
 		return false;
 	}
 
+	@SuppressWarnings("unused")
 	public boolean updateRecord(RID rid, Tuple newTuple) throws ChainException,
 			IOException {
 		// TODO Auto-generated method stub

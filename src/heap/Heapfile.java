@@ -127,6 +127,7 @@ public class Heapfile implements GlobalConst {
 		PageId id = rid.pageNo;
 		HFPage temPage = new HFPage();
 		SystemDefs.JavabaseBM.pinPage(id, temPage, false);
+		temPage.init(id,new Page(temPage.getHFpageArray()));
 		temPage.deleteRecord(rid);
 		SystemDefs.JavabaseBM.unpinPage(id, true);
 		reccnt--;
@@ -140,6 +141,7 @@ public class Heapfile implements GlobalConst {
 		PageId id = rid.pageNo;
 		HFPage temPage = new HFPage();
 		SystemDefs.JavabaseBM.pinPage(id, temPage, false);
+		temPage.init(id,new Page(temPage.getHFpageArray()));
 		Tuple temp = temPage.returnRecord(rid);
 		if (temp.getLength() != newTuple.getLength()) {
 			throw new InvalidUpdateException(null, "Lengths don't match");
@@ -161,6 +163,7 @@ public class Heapfile implements GlobalConst {
 		PageId id = rid.pageNo;
 		HFPage temPage = new HFPage();
 		SystemDefs.JavabaseBM.pinPage(id, temPage, false);
+		temPage.init(id,new Page(temPage.getHFpageArray()));
 		Tuple temp = temPage.getRecord(rid);
 		SystemDefs.JavabaseBM.unpinPage(id, true);
 		return temp;

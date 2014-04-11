@@ -140,7 +140,7 @@ public class Heapfile implements GlobalConst {
 		PageId id = rid.pageNo;
 		HFPage temPage = new HFPage();
 		SystemDefs.JavabaseBM.pinPage(id, temPage, false);
-		Tuple temp = temPage.getRecord(rid);
+		Tuple temp = temPage.returnRecord(rid);
 		if (temp.getLength() != newTuple.getLength()) {
 			throw new InvalidUpdateException(null, "Lengths don't match");
 		} else if (temp != null) {
@@ -148,7 +148,7 @@ public class Heapfile implements GlobalConst {
 			SystemDefs.JavabaseBM.unpinPage(id, true);
 			return true;
 		}
-		SystemDefs.JavabaseBM.unpinPage(id, false);
+		SystemDefs.JavabaseBM.unpinPage(id, true);
 		return false;
 	}
 
@@ -158,20 +158,11 @@ public class Heapfile implements GlobalConst {
 			BufferPoolExceededException, PagePinnedException, BufMgrException,
 			HashEntryNotFoundException, InvalidSlotNumberException {
 		// TODO Auto-generated method stub
-		Tuple temp = null;
-		PageId id = null;
-		for (int i = 0; i < pages_info.size(); i++) {
-			id = pages_info.get(i);
-			HFPage temPage = new HFPage();
-			SystemDefs.JavabaseBM.pinPage(id, temPage, false);
-			temp = temPage.getRecord(rid);
-			if (temp != null) {
-				SystemDefs.JavabaseBM.unpinPage(id, false);
-				return temp;
-			}
-
-			SystemDefs.JavabaseBM.unpinPage(id, false);
-		}
+		PageId id = rid.pageNo;
+		HFPage temPage = new HFPage();
+		SystemDefs.JavabaseBM.pinPage(id, temPage, false);
+		Tuple temp = temPage.getRecord(rid);
+		SystemDefs.JavabaseBM.unpinPage(id, true);
 		return temp;
 	}
 

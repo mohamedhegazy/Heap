@@ -20,6 +20,7 @@ public class Scan {
 	private Heapfile hf;
 	private HFPage curHfPage;
 	private PageId curPageId;
+	// private PageId lastPageId;
 	private RID firstRID;
 	private RID curRid;
 
@@ -32,6 +33,7 @@ public class Scan {
 		curHfPage = hf.getHead();
 		firstRID = hf.getHead().firstRecord();
 		curPageId = curHfPage.getCurPage();
+		// lastPageId = new PageId(new Integer(curPageId.pid));
 		curRid = firstRID;
 		SystemDefs.JavabaseBM.pinPage(curPageId, curHfPage, false);
 	}
@@ -42,18 +44,23 @@ public class Scan {
 			BufferPoolExceededException, PagePinnedException, BufMgrException,
 			HashEntryNotFoundException, IOException, InvalidSlotNumberException {
 		if (curRid == null) {
+			SystemDefs.JavabaseBM.unpinPage(curPageId, true);
 			return null;
 		}
-		rid.copyRid(curRid);
 		Tuple tuple = hf.getRecord(curRid);
 		curRid = curHfPage.nextRecord(curRid);
 		if (curRid == null) {
-			SystemDefs.JavabaseBM.unpinPage(curPageId, true);
-			curPageId = curHfPage.getNextPage();
-			if (curPageId.pid == -1) {
+
+			PageId temp = curHfPage.getNextPage();
+
+			if (temp.pid == -1) {
 				curRid = null;
 			} else {
+				rid.copyRid(curRid);
+				SystemDefs.JavabaseBM.unpinPage(curPageId, true);
+				curPageId = new PageId(temp.pid);
 				curHfPage.setCurPage(curPageId);
+				// curHfPage = new HFPage();
 				SystemDefs.JavabaseBM.pinPage(curPageId, curHfPage, false);
 				curRid = curHfPage.firstRecord();
 			}
@@ -66,6 +73,5 @@ public class Scan {
 		firstRID = null;
 		curRid = null;
 	}
-
 
 }

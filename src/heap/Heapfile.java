@@ -85,13 +85,19 @@ public class Heapfile implements GlobalConst {
 			}
 		}
 		temPage = new HFPage();
-		id = SystemDefs.JavabaseBM.newPage(temPage, 1);
-		temPage.init(id, new Page(temPage.getHFpageArray()));
+		id = pages_info.get(pages_info.size() - 1);
+		SystemDefs.JavabaseBM.pinPage(id, temPage, false);
 		temPage.setCurPage(id);
-		rid = temPage.insertRecord(byteArray);
-		pages_info.add(id);
+		HFPage tempHfPage = new HFPage();
+		PageId temp = SystemDefs.JavabaseBM.newPage(tempHfPage, 1);
+		tempHfPage.init(temp, new Page(tempHfPage.getHFpageArray()));
+		pages_info.add(temp);
+		tempHfPage.setPrevPage(id);
+		temPage.setNextPage(temp);
+		rid = tempHfPage.insertRecord(byteArray);
 		reccnt++;
 		SystemDefs.JavabaseBM.unpinPage(id, true);
+		SystemDefs.JavabaseBM.unpinPage(temp, true);
 		return rid;
 	}
 
@@ -167,5 +173,10 @@ public class Heapfile implements GlobalConst {
 			SystemDefs.JavabaseBM.unpinPage(id, false);
 		}
 		return temp;
+	}
+
+	public PageId getFirstPageId() {
+		// TODO Auto-generated method stub
+		return id_head;
 	}
 }
